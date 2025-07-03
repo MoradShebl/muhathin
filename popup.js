@@ -100,6 +100,12 @@ class PopupController {
           this.toggleExtension();
         }
       }
+      // Shortcut: Ctrl+Shift+X to toggle
+      if (e.ctrlKey && e.shiftKey && (e.key === 'X' || e.key === 'x')) {
+        e.preventDefault();
+        this.elements.toggleBtn.focus();
+        this.toggleExtension();
+      }
     });
 
     // Storage changes listener
@@ -107,6 +113,33 @@ class PopupController {
       if (changes.arabicRTLEnabled) {
         this.state.isEnabled = changes.arabicRTLEnabled.newValue !== false;
         this.updateUI();
+        // Always send enable/disable to all tabs when changed
+        chrome.tabs.query({}, (tabs) => {
+          tabs.forEach(tab => {
+            if (tab.id) {
+              chrome.tabs.sendMessage(
+                tab.id,
+                { action: changes.arabicRTLEnabled.newValue !== false ? 'enable' : 'disable' },
+                () => {}
+              );
+            }
+          });
+        });
+      }
+    });
+
+    // Ensure extension is enabled in background even if popup is not opened
+    chrome.storage.sync.get(['arabicRTLEnabled'], (result) => {
+      if (result.arabicRTLEnabled !== false) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(
+              tabs[0].id,
+              { action: 'enable' },
+              () => {}
+            );
+          }
+        });
       }
     });
   }
